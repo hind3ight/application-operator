@@ -1,7 +1,29 @@
 apiVersion: apps.have2bfun.com/v1
 kind: Application
 metadata:
-  name: application-sample
+  name: nginx-sample
+  namespace: default
+  labels:
+    app: nginx
 spec:
-  # Add fields here
-  foo: bar
+  deployment:
+    replicas: 3
+    selector:
+      matchLabels:
+        app: nginx
+    template:
+      metadata:
+        labels:
+          app: nginx
+      spec:
+        containers:
+          - name: nginx
+            image: have2bfun.artifactory.com/docker-dev/nginx:1.24.0
+            ports:
+              - containerPort: 80
+  service:
+    type: NodePort
+    ports:
+      - port: 80
+        targetPort: 80
+        nodePort: 30080

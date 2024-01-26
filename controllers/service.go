@@ -31,7 +31,7 @@ func (r *ApplicationReconciler) reconcileService(ctx context.Context, app *appsv
 		log.Info("the Application status has been updated")
 		return ctrl.Result{}, nil
 	}
-	if errors.IsNotFound(err) {
+	if !errors.IsNotFound(err) {
 		log.Error(err, "fail to get Service, will requeue after a short time")
 		return ctrl.Result{RequeueAfter: GenericRequeueDuration}, err
 	}

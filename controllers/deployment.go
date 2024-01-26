@@ -34,7 +34,7 @@ func (r *ApplicationReconciler) reconcileDeployment(ctx context.Context, app *ap
 		log.Info("the Application status has been updated")
 		return ctrl.Result{}, nil
 	}
-	if errors.IsNotFound(err) {
+	if !errors.IsNotFound(err) {
 		log.Error(err, "fail to get Deployment, will requeue after a short time")
 		return ctrl.Result{RequeueAfter: GenericRequeueDuration}, err
 	}
