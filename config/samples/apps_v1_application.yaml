@@ -7,18 +7,15 @@ metadata:
     app: nginx
 spec:
   deployment:
-    replicas: 3
+#    replicas: 11
     selector:
       matchLabels:
         app: nginx
     template:
-      metadata:
-        labels:
-          app: nginx
       spec:
         containers:
           - name: nginx
-            image: have2bfun.artifactory.com/docker-dev/nginx:1.24.0
+            image: nginx:1.14.0
             ports:
               - containerPort: 80
   service:

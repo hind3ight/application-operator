@@ -18,13 +18,7 @@ package controllers
 
 import (
 	"context"
-	v1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -32,7 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/hind3ight/application-operator/api/v1"
+	v1 "github.com/hind3ight/application-operator/api/v1"
 )
 
 // ApplicationReconciler reconciles a Application object
@@ -42,110 +36,54 @@ type ApplicationReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-var counterReconcileApplication int64
-
 //+kubebuilder:rbac:groups=apps.have2bfun.com,resources=applications,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps.have2bfun.com,resources=applications/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=apps.have2bfun.com,resources=applications/finalizers,verbs=update
-
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services/status,verbs=get
 
 func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = r.Log.WithValues("application", req.NamespacedName)
-	log := logr.FromContext(ctx)
-	<-time.NewTicker(100 * time.Millisecond).C
-	counterReconcileApplication += 1
-	log.Info("starting reconciling", "number: ", counterReconcileApplication)
+	var CounterReconcileApplication int32
 
-	app := &appsv1.Application{}
+	<-time.NewTicker(100 * time.Millisecond).C
+	log := logr.FromContext(ctx)
+
+	CounterReconcileApplication += 1
+	log.Info("Starting a reconcile", "number", CounterReconcileApplication)
+
+	app := &v1.Application{}
 	if err := r.Get(ctx, req.NamespacedName, app); err != nil {
 		if errors.IsNotFound(err) {
-			log.Error(err, "fail to get application")
-			return ctrl.Result{}, err
+			log.Info("Application not found")
+			return ctrl.Result{}, nil
 		}
+		log.Error(err, "Fail to get the Application, will requeue after a short time.")
+		return ctrl.Result{RequeueAfter: genericRequeueDuration}, err
 	}
 
 	var result ctrl.Result
 	var err error
 	result, err = r.reconcileDeployment(ctx, app)
 	if err != nil {
-		log.Error(err, "fail to reconcile deployment")
+		log.Error(err, "Fail to reconcile Deployment.")
 		return result, err
 	}
 	result, err = r.reconcileService(ctx, app)
 	if err != nil {
-		log.Error(err, "fail to reconcile service")
+		log.Error(err, "Fail to reconcile Service.")
 		return result, err
 	}
+	log.Info("All resources has been reconciled.")
 	return ctrl.Result{}, nil
 }
 
+var genericRequeueDuration = 10 * time.Second
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	setupLog := ctrl.Log.WithName("setup")
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.Application{}, builder.WithPredicates(
-			predicate.Funcs{
-				CreateFunc: func(event event.CreateEvent) bool {
-					return true
-				},
-				DeleteFunc: func(event event.DeleteEvent) bool {
-					setupLog.Info("the Application has been deleted.", "name", event.Object.GetName())
-					return false
-				},
-				UpdateFunc: func(event event.UpdateEvent) bool {
-					if event.ObjectNew.GetResourceVersion() == event.ObjectOld.GetResourceVersion() {
-						return false
-					}
-					if reflect.DeepEqual(event.ObjectNew.(*appsv1.Application).Spec, event.ObjectOld.(*appsv1.Application).Spec) {
-						return true
-					}
-					return true
-				},
-				GenericFunc: nil,
-			})).
-		Owns(&v1.Deployment{}, builder.WithPredicates(
-			predicate.Funcs{
-				CreateFunc: func(event event.CreateEvent) bool {
-					return true
-				},
-				DeleteFunc: func(event event.DeleteEvent) bool {
-					setupLog.Info("the Deployment has been deleted.", "name", event.Object.GetName())
-					return false
-				},
-				UpdateFunc: func(event event.UpdateEvent) bool {
-					if event.ObjectNew.GetResourceVersion() == event.ObjectOld.GetResourceVersion() {
-						return false
-					}
-					if reflect.DeepEqual(event.ObjectNew.(*v1.Deployment).Spec, event.ObjectOld.(*v1.Deployment).Spec) {
-						return true
-					}
-					return true
-				},
-				GenericFunc: nil,
-			})).
-		Owns(&corev1.Service{}, builder.WithPredicates(
-			predicate.Funcs{
-				CreateFunc: func(event event.CreateEvent) bool {
-					return true
-				},
-				DeleteFunc: func(event event.DeleteEvent) bool {
-					setupLog.Info("the Deployment has been deleted.", "name", event.Object.GetName())
-					return false
-				},
-				UpdateFunc: func(event event.UpdateEvent) bool {
-					if event.ObjectNew.GetResourceVersion() == event.ObjectOld.GetResourceVersion() {
-						return false
-					}
-					if reflect.DeepEqual(event.ObjectNew.(*corev1.Service).Spec, event.ObjectOld.(*corev1.Service).Spec) {
-						return true
-					}
-					return true
-				},
-				GenericFunc: nil,
-			})).
+		For(&v1.Application{}).
 		Complete(r)
 }
